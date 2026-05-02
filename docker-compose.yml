@@ -6,12 +6,53 @@ services:
     build:
       context: .
       args:
-        COMPOSER_VERSION: ${COMPOSER_VERSION}
-        XDEBUG_VERSION: ${XDEBUG_VERSION}
-        NODE_VERSION: ${NODE_VERSION}
-        INSTALL_XDEBUG: ${INSTALL_XDEBUG}
-        UID: ${UID}
-        GID: ${GID}
-        TZ: ${TZ}
+        COMPOSER_VERSION: ${COMPOSER_VERSION:?COMPOSER_VERSION não definido no .env}
+        XDEBUG_VERSION: ${XDEBUG_VERSION:?XDEBUG_VERSION não definido no .env}
+        NODE_VERSION: ${NODE_VERSION:?NODE_VERSION não definido no .env}
+        INSTALL_XDEBUG: ${INSTALL_XDEBUG:?INSTALL_XDEBUG não definido no .env}
+        UID: ${UID:?UID não definido no .env}
+        GID: ${GID:?GID não definido no .env}
+        TZ: ${TZ:-UTC}
     env_file:
-      .env
+      - .env
+    volumes:
+      - ./app:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  postgres:
+    container_name: db
+    image: postgres:17-alpine3.23
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB não definido no .env}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER não definido no .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD não definido no .env}
+      TZ: ${TZ:-UTC}
+    command: >
+      postgres
+      -c timezone=${TZ:-UTC}
+      -c log_timezone=${TZ:-UTC}
+    env_file:
+      - .env
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER não definido no .env} -d ${POSTGRES_DB:?POSTGRES_DB não definido no .env}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+
+networks:
+  app_network:
+    driver: bridge
