@@ -15,3 +15,35 @@ ENV COMPOSER_VERSION=${COMPOSER_VERSION} \
   NODE_VERSION=${NODE_VERSION} \
   INSTALL_XDEBUG=${INSTALL_XDEBUG} \
   TZ=${TZ}
+
+RUN apk add --no-cache \
+  bash \
+  git \
+  unzip \
+  curl \
+  tzdata \
+  icu-dev \
+  libzip-dev \
+  postgresql-dev \
+  oniguruma-dev \
+  linux-headers \
+  $PHPIZE_DEPS
+
+RUN docker-php-ext-install \
+  pdo \
+  pdo_pgsql \
+  opcache \
+  zip \
+  intl \
+  mbstring \
+  bcmath
+
+RUN pecl install redis \
+  && docker-php-ext-enable redis
+
+RUN if [ "$INSTALL_XDEBUG" = "true" ]; then \
+    pecl install xdebug-${XDEBUG_VERSION} \
+    && docker-php-ext-enable xdebug; \
+  else \
+    echo "Xdebug installation skipped"; \
+  fi
