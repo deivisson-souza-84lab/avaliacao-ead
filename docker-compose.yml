@@ -26,6 +26,7 @@ services:
       DB_USERNAME: ${POSTGRES_USER:?POSTGRES_USER não definido no .env}
       DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD não definido no .env}
 
+      SESSION_DRIVER: file
       CACHE_STORE: redis
       QUEUE_CONNECTION: sync
 
