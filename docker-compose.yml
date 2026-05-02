@@ -13,13 +13,33 @@ services:
         UID: ${UID:?UID não definido no .env}
         GID: ${GID:?GID não definido no .env}
         TZ: ${TZ:-UTC}
-    env_file:
-      - .env
+    environment:
+      APP_NAME: "Avaliacao EAD"
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost
+
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB:?POSTGRES_DB não definido no .env}
+      DB_USERNAME: ${POSTGRES_USER:?POSTGRES_USER não definido no .env}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD não definido no .env}
+
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: sync
+
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: redis
+      REDIS_PASSWORD: null
+      REDIS_PORT: ${REDIS_PORT:-6379}:6379
     volumes:
       - ./app:/var/www/html
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - app_network
 
@@ -35,8 +55,6 @@ services:
       postgres
       -c timezone=${TZ:-UTC}
       -c log_timezone=${TZ:-UTC}
-    env_file:
-      - .env
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -47,6 +65,14 @@ services:
       timeout: 5s
       retries: 10
       start_period: 5s
+    networks:
+      - app_network
+  
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
     networks:
       - app_network
 
