@@ -9,4 +9,5 @@ Route::apiResource('exams', ExamController::class)
 Route::prefix('student')->group(function () {
   Route::get('exams', [StudentExamController::class, 'index']);
   Route::get('exams/{exam}', [StudentExamController::class, 'show']);
+  Route::post('exams/{exam}/submit', [StudentExamController::class, 'submit']);
 });
