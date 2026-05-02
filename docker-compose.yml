@@ -1,0 +1,17 @@
+name: teste-php
+
+services:
+  app:
+    container_name: app
+    build:
+      context: .
+      args:
+        COMPOSER_VERSION: ${COMPOSER_VERSION}
+        XDEBUG_VERSION: ${XDEBUG_VERSION}
+        NODE_VERSION: ${NODE_VERSION}
+        INSTALL_XDEBUG: ${INSTALL_XDEBUG}
+        UID: ${UID}
+        GID: ${GID}
+        TZ: ${TZ}
+    env_file:
+      .env
