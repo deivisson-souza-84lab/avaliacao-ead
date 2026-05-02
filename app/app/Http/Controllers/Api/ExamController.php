@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreExamRequest;
+use App\Http\Requests\UpdateExamRequest;
 use App\Http\Resources\ExamResource;
 use App\Models\Exam;
 use App\Services\ExamService;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 
 class ExamController extends Controller
 {
@@ -33,5 +35,19 @@ class ExamController extends Controller
     $exam->load('questions.alternatives');
 
     return new ExamResource($exam);
+  }
+
+  public function update(UpdateExamRequest $request, Exam $exam, ExamService $service): ExamResource
+  {
+    $exam = $service->update($exam, $request->validated());
+
+    return new ExamResource($exam);
+  }
+
+  public function destroy(Exam $exam, ExamService $service): Response
+  {
+    $service->delete($exam);
+
+    return response()->noContent();
   }
 }
