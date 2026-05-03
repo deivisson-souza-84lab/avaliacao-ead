@@ -6,9 +6,10 @@ A aplicação consiste em uma plataforma simples de provas EAD, com área de pro
 
 Este README descreve a configuração do ambiente de desenvolvimento e execução via Docker.
 
-A documentação específica da aplicação Laravel, regras de negócio, API e decisões técnicas ficará em [`app/README.md`](app/README.md).
+A documentação específica da aplicação Laravel, regras de negócio, API e decisões técnicas fica em [`app/README.md`](app/README.md).
 
 ---
+
 ## Stack
 
 - PHP 8.4
@@ -19,23 +20,28 @@ A documentação específica da aplicação Laravel, regras de negócio, API e d
 - Nginx
 - Docker
 - Docker Compose
+- PHPUnit / Laravel Test
 - Xdebug para cobertura de testes
 
 ---
+
 ## Estrutura geral
 
 ```text
 .
-├── app/                  # Aplicação Laravel
+├── app/                         # Aplicação Laravel
 ├── docker/
-│   └── nginx/            # Configuração do Nginx
-├── docker-compose.yml    # Orquestração dos serviços
-├── Dockerfile            # Imagem PHP-FPM da aplicação
-├── .env.example          # Variáveis usadas pelo Docker Compose
-└── README.md             # Documentação do ambiente
+│   └── nginx/                   # Configuração do Nginx
+├── docker-compose.yml           # Orquestração dos serviços principais
+├── docker-compose.override.yml  # Ajustes locais de desenvolvimento
+├── Dockerfile                   # Imagem PHP-FPM da aplicação
+├── entrypoint.sh                # Inicialização automática da aplicação
+├── .env.example                 # Variáveis usadas pelo Docker Compose
+└── README.md                    # Documentação do ambiente
 ```
 
 ---
+
 ## Serviços Docker
 
 O ambiente é composto pelos seguintes serviços:
@@ -61,16 +67,27 @@ Laravel
 PostgreSQL / Redis
 ```
 
+A aplicação é acessada pelo Nginx em:
+
+```text
+http://localhost:8000
+```
+
+A porta `5173` é exposta apenas para o Vite durante o desenvolvimento.
+
 ---
+
 ## Pré-requisitos
 
 Antes de iniciar, é necessário ter instalado:
-* Docker
-* Docker Compose
-* Git
+
+- Docker
+- Docker Compose
+- Git
 
 Opcionalmente:
-* `jq`, para visualizar respostas JSON no terminal
+
+- `jq`, para visualizar respostas JSON no terminal.
 
 Em distribuições baseadas em Ubuntu/Debian:
 
@@ -79,7 +96,8 @@ sudo apt install jq
 ```
 
 ---
-## Configuração inicial
+
+## Instalação limpa
 
 Clone o repositório:
 
@@ -94,7 +112,50 @@ Crie o arquivo `.env` da raiz a partir do exemplo:
 cp .env.example .env
 ```
 
-O arquivo `.env` da raiz é usado pelo Docker Compose para configurar os serviços de infraestrutura.
+Suba o ambiente:
+
+```bash
+docker compose up -d --build
+```
+
+Verifique se os serviços estão ativos:
+
+```bash
+docker compose ps
+```
+
+O esperado é que os serviços `app`, `nginx`, `postgres` e `redis` estejam em execução, com o PostgreSQL saudável.
+
+A aplicação ficará disponível em:
+
+```text
+http://localhost:8000
+```
+
+A API ficará disponível em:
+
+```text
+http://localhost:8000/api
+```
+
+---
+
+## Variáveis de ambiente
+
+Este projeto usa uma separação entre variáveis de infraestrutura e variáveis da aplicação.
+
+### `.env` da raiz
+
+O `.env` da raiz é usado pelo Docker Compose.
+
+Ele configura:
+
+- versões de ferramentas;
+- usuário e grupo usados no container em ambiente local;
+- timezone;
+- banco PostgreSQL;
+- porta do Redis;
+- instalação opcional do Xdebug.
 
 Exemplo:
 
@@ -115,82 +176,83 @@ POSTGRES_PORT=5432
 REDIS_PORT=6379
 ```
 
----
-## Sobre variáveis de ambiente
-
-Este projeto usa uma separação entre variáveis de infraestrutura e variáveis da aplicação.
-
-### `.env` da raiz
-
-Usado pelo Docker Compose.
-
-Responsável por configurar:
-* versões de ferramentas;
-* usuário/grupo do container;
-* timezone;
-* banco PostgreSQL;
-* porta do Redis;
-* instalação opcional do Xdebug.
-
 ### `app/.env`
 
-Usado pelo Laravel.
+O `app/.env` é usado pelo Laravel.
+
+Esse arquivo é criado automaticamente pelo `entrypoint.sh` a partir de `app/.env.example`, caso ainda não exista.
 
 As variáveis de infraestrutura da aplicação, como banco, Redis, cache, fila e sessão, são injetadas no container pelo `docker-compose.yml` através de `environment`.
 
 Com isso, o Docker Compose fica como fonte principal da configuração de infraestrutura da aplicação.
 
 ---
-## Subindo o ambiente
 
-Construa e suba os containers:
+## Preparação automática da aplicação
+
+Na primeira subida do container `app`, o `entrypoint.sh` prepara automaticamente a aplicação Laravel.
+
+Quando necessário, ele executa:
 
 ```bash
+cp app/.env.example app/.env
+composer install
+php artisan key:generate
+npm ci
+npm run build
+```
+
+Ou seja, após criar o `.env` da raiz e subir os containers, não é necessário instalar dependências manualmente:
+
+```bash
+cp .env.example .env
 docker compose up -d --build
 ```
 
-Verifique se os serviços estão ativos:
+O entrypoint faz as seguintes verificações:
 
-```bash
-docker compose ps
-```
+| Verificação | Ação automática |
+|---|---|
+| `app/.env` não existe | copia `app/.env.example` para `app/.env` |
+| `vendor/autoload.php` não existe | executa `composer install` |
+| `APP_KEY` não está gerada | executa `php artisan key:generate --force` |
+| `node_modules` não existe | executa `npm ci` |
+| `public/build/manifest.json` não existe | executa `npm run build` |
 
-O esperado é que os serviços `app`, `nginx`, `postgres` e `redis` estejam em execução.
-
-A aplicação ficará disponível em:
-
-```text
-http://localhost:8000
-```
-
-A API ficará disponível em:
-
-```text
-http://localhost:8000/api
-```
+A chave `APP_KEY` é necessária mesmo sem autenticação real, pois o Laravel a usa em recursos internos como criptografia, cookies, sessão e segurança da aplicação.
 
 ---
-## Instalando dependências da aplicação
 
-Entre no container da aplicação para instalar as dependências PHP:
+## Comandos manuais opcionais
+
+Os comandos abaixo são úteis para manutenção, diagnóstico ou execução manual de etapas que o entrypoint já realiza automaticamente quando necessário.
+
+Reinstalar dependências PHP:
 
 ```bash
 docker compose exec app composer install
 ```
 
-Gere a chave da aplicação Laravel:
+Gerar novamente a chave da aplicação:
 
 ```bash
 docker compose exec app php artisan key:generate
 ```
 
-Instale as dependências JavaScript:
+Instalar dependências JavaScript respeitando o lockfile:
 
 ```bash
-docker compose exec app npm install
+docker compose exec app npm ci
+```
+
+Gerar build frontend:
+
+```bash
+docker compose exec app npm run build
 ```
 
 ---
+
 ## Banco de dados
 
 Para rodar as migrations:
@@ -214,6 +276,7 @@ docker compose exec app php artisan migrate:fresh --seed
 O seeder cria uma prova inicial com questões e alternativas para facilitar testes manuais.
 
 ---
+
 ## Testando a API
 
 Após rodar:
@@ -229,7 +292,7 @@ curl -s http://localhost:8000/api/exams \
   -H "Accept: application/json" | jq
 ```
 
-Teste o detalhe de uma prova:
+Teste o detalhe de uma prova na visão do professor:
 
 ```bash
 curl -s http://localhost:8000/api/exams/1 \
@@ -243,7 +306,80 @@ curl -s http://localhost:8000/api/student/exams/1 \
   -H "Accept: application/json" | jq
 ```
 
+Teste o dashboard:
+
+```bash
+curl -s http://localhost:8000/api/dashboard \
+  -H "Accept: application/json" | jq
+```
+
+Teste o ranking:
+
+```bash
+curl -s http://localhost:8000/api/dashboard/ranking \
+  -H "Accept: application/json" | jq
+```
+
 ---
+
+## Exemplo de submissão de prova
+
+Após executar o seeder, a prova inicial possui 3 questões.
+
+Exemplo de submissão:
+
+```bash
+curl -s -X POST http://localhost:8000/api/student/exams/1/submit \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "student_identifier": "aluno1@email.com",
+    "student_name": "Aluno 1",
+    "answers": [
+      {"question_id": 1, "alternative_id": 1},
+      {"question_id": 2, "alternative_id": 6},
+      {"question_id": 3, "alternative_id": 11}
+    ]
+  }' | jq
+```
+
+Resposta esperada:
+
+```http
+201 Created
+```
+
+A API retorna pontuação, percentual e indicação de acerto ou erro por resposta.
+
+### Segunda tentativa
+
+O mesmo aluno não pode realizar a mesma prova mais de uma vez.
+
+Exemplo de resposta esperada:
+
+```http
+422 Unprocessable Content
+```
+
+```json
+{
+  "message": "Este aluno já realizou esta prova.",
+  "errors": {
+    "student_identifier": [
+      "Este aluno já realizou esta prova."
+    ]
+  }
+}
+```
+
+Para obter respostas JSON em erros de validação, envie sempre:
+
+```http
+Accept: application/json
+```
+
+---
+
 ## Testes automatizados
 
 Para rodar a suíte de testes:
@@ -253,23 +389,45 @@ docker compose exec app php artisan test
 ```
 
 A suíte cobre os principais fluxos da aplicação:
-* cadastro de provas;
-* validação de questões e alternativas;
-* edição e exclusão de provas;
-* consulta de provas pelo aluno;
-* submissão de respostas;
-* correção automática;
-* bloqueio de segunda tentativa;
-* dashboard;
-* ranking;
-* cache do dashboard.
+
+- cadastro de provas;
+- validação de questões e alternativas;
+- edição e exclusão de provas;
+- consulta de provas pelo aluno;
+- ocultação do gabarito na visão do aluno;
+- submissão de respostas;
+- correção automática;
+- bloqueio de segunda tentativa;
+- validações de respostas inválidas;
+- dashboard;
+- ranking;
+- cache do dashboard.
+
+Resultado validado:
+
+```text
+Tests: 25 passed (121 assertions)
+```
 
 ---
+
 ## Cobertura de testes
 
-A geração de cobertura depende do Xdebug.
+Para rodar a cobertura:
 
-Para habilitar o Xdebug na imagem, ajuste no `.env` da raiz:
+```bash
+docker compose exec -e XDEBUG_MODE=coverage app php artisan test --coverage
+```
+
+A suíte atual foi validada com cobertura acima de 80%.
+
+Resultado validado:
+
+```text
+Total: 96.7 %
+```
+
+Caso seja necessário reconstruir a imagem garantindo Xdebug, ajuste no `.env` da raiz:
 
 ```env
 INSTALL_XDEBUG="true"
@@ -288,15 +446,64 @@ Confirme se o Xdebug está disponível:
 docker compose exec app php -m | grep xdebug
 ```
 
-Para rodar a cobertura:
+---
 
-```bash
-docker compose exec -e XDEBUG_MODE=coverage app php artisan test --coverage
+## Frontend
+
+A interface Vue.js é integrada ao Laravel via Vite.
+
+A tela inicial permite escolher entre:
+
+- Área do Professor;
+- Área do Aluno.
+
+A aplicação deve ser acessada por:
+
+```text
+http://localhost:8000
 ```
 
-A suíte atual foi validada com cobertura acima de 80%.
+### Área do Professor
+
+Permite:
+
+- visualizar dashboard;
+- listar provas;
+- visualizar detalhes da prova com gabarito;
+- cadastrar prova;
+- editar prova;
+- excluir prova;
+- consultar ranking.
+
+### Área do Aluno
+
+Permite:
+
+- listar provas disponíveis;
+- visualizar prova sem gabarito;
+- informar identificador e nome;
+- responder questões;
+- submeter prova;
+- visualizar resultado com pontuação, percentual e acertos/erros.
+
+### Vite
+
+Em desenvolvimento, a porta `5173` fica disponível para o Vite.
+
+A aplicação principal continua sendo acessada por:
+
+```text
+http://localhost:8000
+```
+
+O build de produção pode ser executado manualmente com:
+
+```bash
+docker compose exec app npm run build
+```
 
 ---
+
 ## Redis
 
 O Redis é usado como driver de cache da aplicação.
@@ -335,6 +542,7 @@ O esperado é:
 ```
 
 ---
+
 ## Comandos úteis
 
 Acessar o container da aplicação:
@@ -347,6 +555,12 @@ Listar rotas Laravel:
 
 ```bash
 docker compose exec app php artisan route:list
+```
+
+Ver informações da aplicação:
+
+```bash
+docker compose exec app php artisan about
 ```
 
 Limpar cache de configuração:
@@ -392,11 +606,74 @@ docker compose down -v
 ```
 
 ---
+
+## Validação rápida da instalação
+
+Um fluxo completo de validação a partir de uma instalação limpa:
+
+```bash
+git clone https://github.com/deivisson-souza-84lab/avaliacao-ead.git
+cd avaliacao-ead
+cp .env.example .env
+docker compose up -d --build
+docker compose exec app php artisan migrate:fresh --seed
+docker compose exec app php artisan test
+docker compose exec -e XDEBUG_MODE=coverage app php artisan test --coverage
+docker compose exec app npm run build
+```
+
+Validar frontend:
+
+```bash
+curl -i http://localhost:8000
+```
+
+Validar API:
+
+```bash
+curl -s http://localhost:8000/api/exams \
+  -H "Accept: application/json" | jq
+```
+
+---
+
 ## Observações sobre o ambiente
 
-* O serviço `app` executa PHP-FPM.
-* O serviço `nginx` expõe a aplicação na porta `8000`.
-* O serviço `postgres` expõe o banco na porta configurada por `POSTGRES_PORT`.
-* O serviço `redis` expõe o Redis na porta configurada por `REDIS_PORT`.
-* As variáveis de banco, Redis, cache, fila e sessão são injetadas no container da aplicação pelo `docker-compose.yml`.
-* O arquivo `app/.env.example` mantém apenas configurações próprias da aplicação Laravel, evitando duplicidade com a infraestrutura.
+- O serviço `app` executa PHP-FPM.
+- O serviço `nginx` expõe a aplicação na porta `8000`.
+- O serviço `postgres` expõe o banco na porta configurada por `POSTGRES_PORT`.
+- O serviço `redis` expõe o Redis na porta configurada por `REDIS_PORT`.
+- As variáveis de banco, Redis, cache, fila e sessão são injetadas no container da aplicação pelo `docker-compose.yml`.
+- O arquivo `app/.env.example` mantém apenas configurações próprias da aplicação Laravel, evitando duplicidade com a infraestrutura.
+- O `docker-compose.override.yml` aplica ajustes locais de desenvolvimento, incluindo o usuário `${UID}:${GID}` e a exposição da porta `5173`.
+- Não há autenticação real por decisão de escopo; professor e aluno são separados pela interface.
+
+---
+
+## Status da entrega
+
+Implementado:
+
+- API REST de provas;
+- área do professor;
+- área do aluno;
+- cadastro de provas;
+- edição de provas;
+- exclusão de provas;
+- listagem e detalhe de provas;
+- consulta de provas disponíveis para alunos;
+- ocultação do gabarito na visão do aluno;
+- submissão de respostas;
+- correção automática;
+- pontuação e percentual;
+- bloqueio de segunda tentativa;
+- dashboard;
+- ranking paginado;
+- cache com Redis;
+- testes automatizados;
+- cobertura acima de 80%;
+- interface Vue.js consumindo a API;
+- execução via Docker/Docker Compose;
+- entrypoint de preparação automática da aplicação.
+
+Não há pendências funcionais conhecidas para o escopo implementado.
