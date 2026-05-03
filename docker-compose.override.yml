@@ -1,3 +1,5 @@
 services:
   app:
     user: "${UID}:${GID}"
+    ports:
+      - "5173:5173"
