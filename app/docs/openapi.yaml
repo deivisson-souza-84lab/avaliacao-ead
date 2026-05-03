@@ -1,0 +1,845 @@
+openapi: 3.0.3
+info:
+  title: Avaliação EAD API
+  description: |
+    API REST da aplicação Avaliação EAD.
+
+    A API permite gerenciar provas pelo fluxo do professor, listar e submeter provas pelo fluxo do aluno,
+    consultar dashboard de desempenho e ranking de tentativas.
+
+    Não há autenticação real nesta versão por decisão de escopo do teste técnico.
+    Os fluxos de professor e aluno são separados por endpoints e pela interface.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Ambiente local via Docker Compose
+
+tags:
+  - name: Professor
+    description: Endpoints para gerenciamento de provas
+  - name: Aluno
+    description: Endpoints para visualização e submissão de provas
+  - name: Dashboard
+    description: Endpoints de métricas e ranking
+
+paths:
+  /api/exams:
+    get:
+      tags:
+        - Professor
+      summary: Listar provas
+      description: Retorna a listagem paginada de provas cadastradas.
+      operationId: listExams
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Lista paginada de provas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamCollectionResponse"
+
+    post:
+      tags:
+        - Professor
+      summary: Criar prova
+      description: Cria uma prova com questões e alternativas.
+      operationId: createExam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExamPayload"
+            examples:
+              createExam:
+                summary: Prova com uma questão
+                value:
+                  title: Prova de Docker
+                  description: Prova criada via API
+                  is_available: true
+                  questions:
+                    - statement: Qual comando sobe os containers em segundo plano?
+                      alternatives:
+                        - text: docker compose up -d
+                          is_correct: true
+                        - text: composer install
+                          is_correct: false
+      responses:
+        "201":
+          description: Prova criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamDetailResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/exams/{exam}:
+    get:
+      tags:
+        - Professor
+      summary: Detalhar prova
+      description: Retorna uma prova com questões, alternativas e gabarito.
+      operationId: getExam
+      parameters:
+        - $ref: "#/components/parameters/ExamId"
+      responses:
+        "200":
+          description: Detalhe da prova
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      tags:
+        - Professor
+      summary: Atualizar prova
+      description: Atualiza uma prova. O payload representa o estado final da prova.
+      operationId: updateExamPut
+      parameters:
+        - $ref: "#/components/parameters/ExamId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExamPayload"
+      responses:
+        "200":
+          description: Prova atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+    patch:
+      tags:
+        - Professor
+      summary: Atualizar prova parcialmente
+      description: Atualiza uma prova. O payload representa o estado final da prova.
+      operationId: updateExamPatch
+      parameters:
+        - $ref: "#/components/parameters/ExamId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExamPayload"
+      responses:
+        "200":
+          description: Prova atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+    delete:
+      tags:
+        - Professor
+      summary: Excluir prova
+      description: Remove uma prova cadastrada.
+      operationId: deleteExam
+      parameters:
+        - $ref: "#/components/parameters/ExamId"
+      responses:
+        "204":
+          description: Prova excluída sem conteúdo de resposta
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/student/exams:
+    get:
+      tags:
+        - Aluno
+      summary: Listar provas disponíveis
+      description: Retorna apenas provas disponíveis para realização pelo aluno.
+      operationId: listStudentExams
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Lista paginada de provas disponíveis
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentExamCollectionResponse"
+
+  /api/student/exams/{exam}:
+    get:
+      tags:
+        - Aluno
+      summary: Detalhar prova disponível
+      description: Retorna uma prova disponível sem expor o campo is_correct das alternativas.
+      operationId: getStudentExam
+      parameters:
+        - $ref: "#/components/parameters/ExamId"
+      responses:
+        "200":
+          description: Detalhe da prova para aluno, sem gabarito
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentExamDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/student/exams/{exam}/submit:
+    post:
+      tags:
+        - Aluno
+      summary: Submeter prova
+      description: |
+        Submete as respostas de um aluno para uma prova disponível.
+
+        Regras principais:
+        - o aluno deve responder todas as questões;
+        - cada questão deve ser respondida uma única vez;
+        - a questão deve pertencer à prova;
+        - a alternativa deve pertencer à questão informada;
+        - o mesmo aluno não pode realizar a mesma prova mais de uma vez.
+      operationId: submitStudentExam
+      parameters:
+        - $ref: "#/components/parameters/ExamId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitExamPayload"
+            examples:
+              submitExam:
+                summary: Submissão de prova
+                value:
+                  student_identifier: aluno1@email.com
+                  student_name: Aluno 1
+                  answers:
+                    - question_id: 1
+                      alternative_id: 1
+                    - question_id: 2
+                      alternative_id: 6
+                    - question_id: 3
+                      alternative_id: 11
+      responses:
+        "201":
+          description: Prova submetida e corrigida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExamAttemptResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/dashboard:
+    get:
+      tags:
+        - Dashboard
+      summary: Resumo do dashboard
+      description: Retorna média geral, melhor pontuação e total de tentativas.
+      operationId: getDashboardSummary
+      responses:
+        "200":
+          description: Resumo do dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummaryResponse"
+
+  /api/dashboard/ranking:
+    get:
+      tags:
+        - Dashboard
+      summary: Ranking paginado
+      description: Retorna o ranking paginado de tentativas.
+      operationId: getDashboardRanking
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PerPage"
+      responses:
+        "200":
+          description: Ranking paginado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RankingCollectionResponse"
+
+components:
+  parameters:
+    ExamId:
+      name: exam
+      in: path
+      required: true
+      description: ID da prova
+      schema:
+        type: integer
+        example: 1
+
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Página atual
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+        example: 1
+
+    PerPage:
+      name: per_page
+      in: query
+      required: false
+      description: Quantidade de itens por página
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 10
+        example: 10
+
+  responses:
+    ValidationError:
+      description: Erro de validação
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+          examples:
+            duplicateAttempt:
+              summary: Segunda tentativa do mesmo aluno
+              value:
+                message: Este aluno já realizou esta prova.
+                errors:
+                  student_identifier:
+                    - Este aluno já realizou esta prova.
+            invalidAlternatives:
+              summary: Questão sem exatamente uma alternativa correta
+              value:
+                message: Cada questão deve possuir exatamente uma alternativa correta.
+                errors:
+                  questions.0.alternatives:
+                    - Cada questão deve possuir exatamente uma alternativa correta.
+
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorMessage"
+          example:
+            message: Not Found
+
+  schemas:
+    Exam:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - is_available
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Fundamentos de PHP e Laravel
+        description:
+          type: string
+          nullable: true
+          example: Prova introdutória sobre PHP, Composer, Laravel e APIs REST.
+        is_available:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-05-03T04:18:51.000000Z"
+        updated_at:
+          type: string
+          format: date-time
+          example: "2026-05-03T04:18:51.000000Z"
+
+    ExamDetail:
+      allOf:
+        - $ref: "#/components/schemas/Exam"
+        - type: object
+          required:
+            - questions
+          properties:
+            questions:
+              type: array
+              items:
+                $ref: "#/components/schemas/QuestionWithCorrectAlternatives"
+
+    StudentExam:
+      type: object
+      required:
+        - id
+        - title
+        - description
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Fundamentos de PHP e Laravel
+        description:
+          type: string
+          nullable: true
+          example: Prova introdutória sobre PHP, Composer, Laravel e APIs REST.
+
+    StudentExamDetail:
+      allOf:
+        - $ref: "#/components/schemas/StudentExam"
+        - type: object
+          required:
+            - questions
+          properties:
+            questions:
+              type: array
+              items:
+                $ref: "#/components/schemas/QuestionWithoutCorrectAlternatives"
+
+    QuestionWithCorrectAlternatives:
+      type: object
+      required:
+        - id
+        - statement
+        - alternatives
+      properties:
+        id:
+          type: integer
+          example: 1
+        statement:
+          type: string
+          example: Qual comando instala as dependências PHP de um projeto?
+        alternatives:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlternativeWithCorrectFlag"
+
+    QuestionWithoutCorrectAlternatives:
+      type: object
+      required:
+        - id
+        - statement
+        - alternatives
+      properties:
+        id:
+          type: integer
+          example: 1
+        statement:
+          type: string
+          example: Qual comando instala as dependências PHP de um projeto?
+        alternatives:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlternativeWithoutCorrectFlag"
+
+    AlternativeWithCorrectFlag:
+      type: object
+      required:
+        - id
+        - text
+        - is_correct
+      properties:
+        id:
+          type: integer
+          example: 1
+        text:
+          type: string
+          example: composer install
+        is_correct:
+          type: boolean
+          example: true
+
+    AlternativeWithoutCorrectFlag:
+      type: object
+      required:
+        - id
+        - text
+      properties:
+        id:
+          type: integer
+          example: 1
+        text:
+          type: string
+          example: composer install
+
+    ExamPayload:
+      type: object
+      required:
+        - title
+        - questions
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          example: Prova de Docker
+        description:
+          type: string
+          nullable: true
+          example: Prova criada via API
+        is_available:
+          type: boolean
+          example: true
+        questions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/QuestionPayload"
+
+    QuestionPayload:
+      type: object
+      required:
+        - statement
+        - alternatives
+      properties:
+        statement:
+          type: string
+          example: Qual comando sobe os containers em segundo plano?
+        alternatives:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/AlternativePayload"
+
+    AlternativePayload:
+      type: object
+      required:
+        - text
+        - is_correct
+      properties:
+        text:
+          type: string
+          example: docker compose up -d
+        is_correct:
+          type: boolean
+          example: true
+
+    SubmitExamPayload:
+      type: object
+      required:
+        - student_identifier
+        - answers
+      properties:
+        student_identifier:
+          type: string
+          maxLength: 255
+          example: aluno1@email.com
+        student_name:
+          type: string
+          nullable: true
+          maxLength: 255
+          example: Aluno 1
+        answers:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/SubmitAnswerPayload"
+
+    SubmitAnswerPayload:
+      type: object
+      required:
+        - question_id
+        - alternative_id
+      properties:
+        question_id:
+          type: integer
+          example: 1
+        alternative_id:
+          type: integer
+          example: 1
+
+    ExamAttempt:
+      type: object
+      required:
+        - id
+        - student_identifier
+        - student_name
+        - score
+        - total_questions
+        - percentage
+        - submitted_at
+        - exam
+        - answers
+      properties:
+        id:
+          type: integer
+          example: 1
+        student_identifier:
+          type: string
+          example: aluno1@email.com
+        student_name:
+          type: string
+          nullable: true
+          example: Aluno 1
+        score:
+          type: integer
+          example: 2
+        total_questions:
+          type: integer
+          example: 3
+        percentage:
+          type: number
+          format: float
+          example: 66.67
+        submitted_at:
+          type: string
+          format: date-time
+          example: "2026-05-03T04:20:58.000000Z"
+        exam:
+          $ref: "#/components/schemas/StudentExam"
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExamAttemptAnswer"
+
+    ExamAttemptAnswer:
+      type: object
+      required:
+        - question_id
+        - alternative_id
+        - is_correct
+      properties:
+        question_id:
+          type: integer
+          example: 1
+        alternative_id:
+          type: integer
+          example: 1
+        is_correct:
+          type: boolean
+          example: true
+
+    RankingAttempt:
+      type: object
+      required:
+        - id
+        - student_identifier
+        - student_name
+        - score
+        - total_questions
+        - percentage
+        - submitted_at
+        - exam
+      properties:
+        id:
+          type: integer
+          example: 1
+        student_identifier:
+          type: string
+          example: aluno1@email.com
+        student_name:
+          type: string
+          nullable: true
+          example: Aluno 1
+        score:
+          type: integer
+          example: 2
+        total_questions:
+          type: integer
+          example: 3
+        percentage:
+          type: number
+          format: float
+          example: 66.67
+        submitted_at:
+          type: string
+          format: date-time
+          example: "2026-05-03T04:20:58.000000Z"
+        exam:
+          $ref: "#/components/schemas/StudentExam"
+
+    DashboardSummary:
+      type: object
+      required:
+        - average_score
+        - best_score
+        - total_attempts
+      properties:
+        average_score:
+          type: number
+          format: float
+          example: 66.67
+        best_score:
+          type: number
+          format: float
+          example: 100
+        total_attempts:
+          type: integer
+          example: 2
+
+    PaginationLinks:
+      type: object
+      properties:
+        first:
+          type: string
+          nullable: true
+          example: http://localhost:8000/api/exams?page=1
+        last:
+          type: string
+          nullable: true
+          example: http://localhost:8000/api/exams?page=1
+        prev:
+          type: string
+          nullable: true
+          example: null
+        next:
+          type: string
+          nullable: true
+          example: null
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page:
+          type: integer
+          example: 1
+        from:
+          type: integer
+          nullable: true
+          example: 1
+        last_page:
+          type: integer
+          example: 1
+        path:
+          type: string
+          example: http://localhost:8000/api/exams
+        per_page:
+          type: integer
+          example: 10
+        to:
+          type: integer
+          nullable: true
+          example: 1
+        total:
+          type: integer
+          example: 1
+
+    ExamCollectionResponse:
+      type: object
+      required:
+        - data
+        - links
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Exam"
+        links:
+          $ref: "#/components/schemas/PaginationLinks"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    StudentExamCollectionResponse:
+      type: object
+      required:
+        - data
+        - links
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudentExam"
+        links:
+          $ref: "#/components/schemas/PaginationLinks"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    RankingCollectionResponse:
+      type: object
+      required:
+        - data
+        - links
+        - meta
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RankingAttempt"
+        links:
+          $ref: "#/components/schemas/PaginationLinks"
+        meta:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    ExamDetailResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/ExamDetail"
+
+    StudentExamDetailResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/StudentExamDetail"
+
+    ExamAttemptResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/ExamAttempt"
+
+    DashboardSummaryResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          $ref: "#/components/schemas/DashboardSummary"
+
+    ValidationError:
+      type: object
+      required:
+        - message
+        - errors
+      properties:
+        message:
+          type: string
+          example: The given data was invalid.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    ErrorMessage:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: Not Found

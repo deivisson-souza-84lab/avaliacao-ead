@@ -322,6 +322,22 @@ curl -s http://localhost:8000/api/dashboard/ranking \
 
 ---
 
+## Documentação da API
+
+A documentação principal dos endpoints está descrita em Markdown no arquivo `app/README.md`.
+
+Além disso, o projeto inclui uma especificação formal da API no padrão OpenAPI 3.0:
+
+```text
+app/docs/openapi.yaml
+```
+
+A opção por um arquivo OpenAPI estático foi intencional para esta entrega. Como a aplicação já está em fase final de validação, evitou-se adicionar um pacote Swagger ao Laravel apenas para servir a documentação, reduzindo risco de regressão, novas dependências e mudanças em rotas ou providers.
+
+O arquivo pode ser aberto em ferramentas compatíveis com OpenAPI/Swagger, como Swagger Editor, Swagger UI, Postman, Insomnia, Stoplight ou Redoc.
+
+---
+
 ## Exemplo de submissão de prova
 
 Após executar o seeder, a prova inicial possui 3 questões.
