@@ -256,8 +256,9 @@
         Nenhuma prova cadastrada até o momento.
       </div>
 
-      <div v-else class="overflow-hidden rounded-2xl border border-slate-200">
-        <table class="min-w-full divide-y divide-slate-200">
+      <div v-else>
+        <div class="overflow-hidden rounded-2xl border border-slate-200">
+          <table class="min-w-full divide-y divide-slate-200">
           <thead class="bg-slate-50">
             <tr>
               <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -322,7 +323,48 @@
               </td>
             </tr>
           </tbody>
-        </table>
+          </table>
+        </div>
+
+        <div v-if="examsMeta && examsMeta.total > 0" class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p class="text-sm text-slate-600">
+            Mostrando {{ examsMeta.from }}–{{ examsMeta.to }} de {{ examsMeta.total }} provas.
+          </p>
+
+          <div v-if="examsMeta.last_page > 1" class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="loading || examsMeta.current_page === 1"
+              @click="goToExamsPage(examsMeta.current_page - 1)"
+            >
+              Anterior
+            </button>
+
+            <button
+              v-for="page in paginationPages(examsMeta)"
+              :key="`exam-page-${page}`"
+              type="button"
+              class="rounded-lg border px-3 py-2 text-xs font-semibold transition"
+              :class="page === examsMeta.current_page
+                ? 'border-indigo-600 bg-indigo-600 text-white'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'"
+              :disabled="loading"
+              @click="goToExamsPage(page)"
+            >
+              {{ page }}
+            </button>
+
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="loading || examsMeta.current_page === examsMeta.last_page"
+              @click="goToExamsPage(examsMeta.current_page + 1)"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -410,8 +452,9 @@
         Nenhuma tentativa registrada até o momento.
       </div>
 
-      <div v-else class="overflow-hidden rounded-2xl border border-slate-200">
-        <table class="min-w-full divide-y divide-slate-200">
+      <div v-else>
+        <div class="overflow-hidden rounded-2xl border border-slate-200">
+          <table class="min-w-full divide-y divide-slate-200">
           <thead class="bg-slate-50">
             <tr>
               <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -438,7 +481,7 @@
           <tbody class="divide-y divide-slate-200 bg-white">
             <tr v-for="(attempt, index) in ranking" :key="attempt.id" class="transition hover:bg-slate-50">
               <td class="px-5 py-4 text-sm font-semibold text-slate-900">
-                #{{ index + 1 }}
+                #{{ rankingPosition(index) }}
               </td>
 
               <td class="px-5 py-4">
@@ -470,7 +513,48 @@
               </td>
             </tr>
           </tbody>
-        </table>
+          </table>
+        </div>
+
+        <div v-if="rankingMeta && rankingMeta.total > 0" class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p class="text-sm text-slate-600">
+            Mostrando {{ rankingMeta.from }}–{{ rankingMeta.to }} de {{ rankingMeta.total }} tentativas.
+          </p>
+
+          <div v-if="rankingMeta.last_page > 1" class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="rankingLoading || rankingMeta.current_page === 1"
+              @click="goToRankingPage(rankingMeta.current_page - 1)"
+            >
+              Anterior
+            </button>
+
+            <button
+              v-for="page in paginationPages(rankingMeta)"
+              :key="`ranking-page-${page}`"
+              type="button"
+              class="rounded-lg border px-3 py-2 text-xs font-semibold transition"
+              :class="page === rankingMeta.current_page
+                ? 'border-indigo-600 bg-indigo-600 text-white'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'"
+              :disabled="rankingLoading"
+              @click="goToRankingPage(page)"
+            >
+              {{ page }}
+            </button>
+
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="rankingLoading || rankingMeta.current_page === rankingMeta.last_page"
+              @click="goToRankingPage(rankingMeta.current_page + 1)"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </section>
@@ -481,10 +565,16 @@ import { onMounted, ref } from 'vue';
 import { api } from '../services/api';
 
 const exams = ref([]);
+const examsMeta = ref(null);
+const examsPage = ref(1);
+const examsPerPage = 10;
 const loading = ref(false);
 const errorMessage = ref('');
 
 const ranking = ref([]);
+const rankingMeta = ref(null);
+const rankingPage = ref(1);
+const rankingPerPage = 10;
 const rankingLoading = ref(false);
 const rankingErrorMessage = ref('');
 
@@ -522,14 +612,20 @@ async function loadDashboard() {
   }
 }
 
-async function loadExams() {
+async function loadExams(page = examsPage.value) {
   loading.value = true;
   errorMessage.value = '';
 
   try {
-    const response = await api.get('/exams');
+    const response = await api.get(`/exams?page=${page}&per_page=${examsPerPage}`);
 
     exams.value = response.data || [];
+    examsMeta.value = response.meta || null;
+    examsPage.value = examsMeta.value?.current_page || page;
+
+    if (exams.value.length === 0 && examsPage.value > 1) {
+      await loadExams(examsPage.value - 1);
+    }
   } catch (error) {
     errorMessage.value = error.message || 'Não foi possível carregar as provas.';
   } finally {
@@ -537,14 +633,20 @@ async function loadExams() {
   }
 }
 
-async function loadRanking() {
+async function loadRanking(page = rankingPage.value) {
   rankingLoading.value = true;
   rankingErrorMessage.value = '';
 
   try {
-    const response = await api.get('/dashboard/ranking?per_page=10');
+    const response = await api.get(`/dashboard/ranking?page=${page}&per_page=${rankingPerPage}`);
 
     ranking.value = response.data || [];
+    rankingMeta.value = response.meta || null;
+    rankingPage.value = rankingMeta.value?.current_page || page;
+
+    if (ranking.value.length === 0 && rankingPage.value > 1) {
+      await loadRanking(rankingPage.value - 1);
+    }
   } catch (error) {
     rankingErrorMessage.value = error.message || 'Não foi possível carregar o ranking.';
   } finally {
@@ -590,8 +692,8 @@ async function deleteExam(exam) {
     }
 
     await loadDashboard();
-    await loadExams();
-    await loadRanking();
+    await loadExams(examsPage.value);
+    await loadRanking(rankingPage.value);
   } catch (error) {
     errorMessage.value = error.message || 'Não foi possível excluir a prova.';
   } finally {
@@ -616,8 +718,8 @@ async function submitCreateExam() {
     closeCreateForm();
 
     await loadDashboard();
-    await loadExams();
-    await loadRanking();
+    await loadExams(examsPage.value);
+    await loadRanking(rankingPage.value);
   } catch (error) {
     createErrorMessage.value = error.message || (
       isEditing
@@ -652,6 +754,34 @@ async function openEditForm(exam) {
 function clearSelectedExam() {
   selectedExam.value = null;
   selectedExamErrorMessage.value = '';
+}
+
+function paginationPages(meta) {
+  return (meta?.links || [])
+    .map((link) => link.page)
+    .filter((page, index, pages) => page !== null && pages.indexOf(page) === index);
+}
+
+function goToExamsPage(page) {
+  if (!examsMeta.value || page < 1 || page > examsMeta.value.last_page || page === examsMeta.value.current_page) {
+    return;
+  }
+
+  loadExams(page);
+}
+
+function goToRankingPage(page) {
+  if (!rankingMeta.value || page < 1 || page > rankingMeta.value.last_page || page === rankingMeta.value.current_page) {
+    return;
+  }
+
+  loadRanking(page);
+}
+
+function rankingPosition(index) {
+  const from = rankingMeta.value?.from || 1;
+
+  return from + index;
 }
 
 function formatDate(value) {

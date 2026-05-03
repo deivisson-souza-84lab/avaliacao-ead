@@ -18,10 +18,18 @@ async function request(path, options = {}) {
   const data = hasJsonResponse ? await response.json() : null;
 
   if (!response.ok) {
-    const error = new Error(data?.message || 'Erro ao processar requisição.');
+    const fallbackMessage = response.status >= 500
+      ? 'Erro interno ao processar a requisição. Verifique se o ambiente foi inicializado corretamente e tente novamente.'
+      : 'Erro ao processar requisição.';
+
+    const error = new Error(data?.message || fallbackMessage);
+
+    if (response.status >= 500) {
+      error.message = fallbackMessage;
+    }
 
     error.status = response.status;
-    error.errors = data?.errors || {};
+    error.errors = response.status >= 500 ? {} : (data?.errors || {});
 
     throw error;
   }

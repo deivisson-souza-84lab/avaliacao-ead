@@ -21,20 +21,12 @@ class DashboardService
 
   public function ranking(int $perPage = 10): LengthAwarePaginator
   {
-    $page = request()->integer('page', 1);
-
-    return Cache::remember(
-      "dashboard:ranking:page:$page:per_page:$perPage",
-      now()->addMinutes(5),
-      function () use ($perPage): LengthAwarePaginator {
-        return ExamAttempt::query()
-          ->with('exam')
-          ->orderByDesc('percentage')
-          ->orderByDesc('score')
-          ->orderBy('submitted_at')
-          ->paginate($perPage);
-      }
-    );
+    return ExamAttempt::query()
+      ->with('exam')
+      ->orderByDesc('percentage')
+      ->orderByDesc('score')
+      ->orderBy('submitted_at')
+      ->paginate($perPage);
   }
 
   public function clearCache(): void
