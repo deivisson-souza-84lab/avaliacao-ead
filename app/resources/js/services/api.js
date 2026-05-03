@@ -19,7 +19,7 @@ async function request(path, options = {}) {
 
   if (!response.ok) {
     const fallbackMessage = response.status >= 500
-      ? 'Erro interno ao processar a requisição. Verifique se o ambiente foi inicializado corretamente e tente novamente.'
+      ? 'Banco de dados ainda não preparado. Execute as migrations conforme o README e atualize a página.'
       : 'Erro ao processar requisição.';
 
     const error = new Error(data?.message || fallbackMessage);
