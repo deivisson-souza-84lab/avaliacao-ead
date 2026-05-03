@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
+use Illuminate\Validation\Rule;
 
 class UpdateExamRequest extends FormRequest
 {
@@ -24,7 +25,12 @@ class UpdateExamRequest extends FormRequest
   public function rules(): array
   {
     return [
-      'title' => ['required', 'string', 'max:255'],
+      'title' => [
+        'required',
+        'string',
+        'max:255',
+        Rule::unique('exams', 'title')->ignore($this->route('exam')),
+      ],
       'description' => ['nullable', 'string'],
       'is_available' => ['sometimes', 'boolean'],
 
@@ -66,6 +72,7 @@ class UpdateExamRequest extends FormRequest
     return [
       'title.required' => 'O título da prova é obrigatório.',
       'title.max' => 'O título da prova não pode ter mais de 255 caracteres.',
+      'title.unique' => 'Já existe uma prova cadastrada com este título.',
 
       'questions.required' => 'A prova deve possuir pelo menos uma questão.',
       'questions.array' => 'As questões devem ser enviadas em formato de lista.',

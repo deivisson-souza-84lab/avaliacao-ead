@@ -313,4 +313,113 @@ class ExamManagementTest extends TestCase
       'id' => $question->id,
     ]);
   }
+
+  public function test_teacher_cannot_create_exam_with_duplicate_title(): void
+  {
+    Exam::factory()->create([
+      'title' => 'Prova de PHP',
+    ]);
+
+    $payload = [
+      'title' => 'Prova de PHP',
+      'description' => 'Outra prova com mesmo título.',
+      'is_available' => true,
+      'questions' => [
+        [
+          'statement' => 'Qual comando instala dependências PHP?',
+          'alternatives' => [
+            [
+              'text' => 'composer install',
+              'is_correct' => true,
+            ],
+            [
+              'text' => 'npm install',
+              'is_correct' => false,
+            ],
+          ],
+        ],
+      ],
+    ];
+
+    $response = $this->postJson('/api/exams', $payload);
+
+    $response
+      ->assertUnprocessable()
+      ->assertJsonValidationErrors('title');
+
+    $this->assertDatabaseCount('exams', 1);
+  }
+
+  public function test_teacher_cannot_update_exam_with_duplicate_title(): void
+  {
+    Exam::factory()->create([
+      'title' => 'Prova já existente',
+    ]);
+
+    $exam = Exam::factory()->create([
+      'title' => 'Prova original',
+    ]);
+
+    $payload = [
+      'title' => 'Prova já existente',
+      'description' => 'Tentando usar título duplicado.',
+      'is_available' => true,
+      'questions' => [
+        [
+          'statement' => 'Pergunta válida?',
+          'alternatives' => [
+            [
+              'text' => 'Alternativa correta',
+              'is_correct' => true,
+            ],
+            [
+              'text' => 'Alternativa incorreta',
+              'is_correct' => false,
+            ],
+          ],
+        ],
+      ],
+    ];
+
+    $response = $this->putJson("/api/exams/{$exam->id}", $payload);
+
+    $response
+      ->assertUnprocessable()
+      ->assertJsonValidationErrors('title');
+  }
+
+  public function test_teacher_can_update_exam_keeping_same_title(): void
+  {
+    $exam = Exam::factory()->create([
+      'title' => 'Prova original',
+    ]);
+
+    $payload = [
+      'title' => 'Prova original',
+      'description' => 'Descrição atualizada.',
+      'is_available' => true,
+      'questions' => [
+        [
+          'statement' => 'Pergunta atualizada?',
+          'alternatives' => [
+            [
+              'text' => 'Alternativa correta',
+              'is_correct' => true,
+            ],
+            [
+              'text' => 'Alternativa incorreta',
+              'is_correct' => false,
+            ],
+          ],
+        ],
+      ],
+    ];
+
+    $response = $this->putJson("/api/exams/{$exam->id}", $payload);
+
+    $response
+      ->assertOk()
+      ->assertJsonPath('data.title', 'Prova original')
+      ->assertJsonPath('data.description', 'Descrição atualizada.');
+  }
 }

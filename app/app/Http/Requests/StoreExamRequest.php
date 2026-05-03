@@ -24,7 +24,7 @@ class StoreExamRequest extends FormRequest
   public function rules(): array
   {
     return [
-      'title' => ['required', 'string', 'max:255'],
+      'title' => ['required', 'string', 'max:255', 'unique:exams,title'],
       'description' => ['nullable', 'string'],
       'is_available' => ['sometimes', 'boolean'],
 
@@ -66,6 +66,7 @@ class StoreExamRequest extends FormRequest
     return [
       'title.required' => 'O título da prova é obrigatório.',
       'title.max' => 'O título da prova não pode ter mais de 255 caracteres.',
+      'title.unique' => 'Já existe uma prova cadastrada com este título.',
 
       'questions.required' => 'A prova deve possuir pelo menos uma questão.',
       'questions.array' => 'As questões devem ser enviadas em formato de lista.',
