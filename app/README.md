@@ -829,9 +829,70 @@ Implementado:
 - ranking paginado;
 - cache com Redis;
 - testes automatizados;
-- cobertura acima de 80%.
+- cobertura acima de 80%;
+- interface Vue.js para professor;
+- interface Vue.js para aluno;
+- cadastro de provas pela interface;
+- edição de provas pela interface;
+- exclusão de provas pela interface;
+- visualização de detalhes da prova pela interface;
+- submissão de provas pela interface do aluno;
+- exibição de resultado da prova pela interface.
 
 Ainda pendente:
 
-- interface Vue.js para professor e aluno;
-- documentação visual ou OpenAPI/Swagger, caso seja desejado complementar esta documentação em Markdown.
+- Não há pendências funcionais conhecidas para o escopo implementado.
+
+Possíveis melhorias futuras:
+
+- paginação visual avançada no frontend;
+- documentação OpenAPI/Swagger;
+- versionamento ou bloqueio de edição para provas que já possuem tentativas;
+- refinamento visual da interface;
+- filtros e busca na listagem de provas;
+- filtros no ranking por prova ou aluno.
+
+---
+
+## Interface Vue.js
+
+A aplicação possui uma interface Vue.js integrada ao Laravel via Vite.
+
+A tela inicial permite escolher entre:
+
+- área do professor;
+- área do aluno.
+
+A aplicação separa os fluxos de professor e aluno pela interface, sem camada de autenticação, conforme o escopo definido para esta entrega.
+
+### Área do professor
+
+A área do professor permite:
+
+- visualizar dashboard com média geral, melhor pontuação e total de tentativas;
+- listar provas cadastradas;
+- visualizar detalhes de uma prova, incluindo questões, alternativas e gabarito;
+- cadastrar novas provas;
+- editar provas existentes;
+- excluir provas;
+- consultar ranking de tentativas.
+
+### Área do aluno
+
+A área do aluno permite:
+
+- listar provas disponíveis;
+- acessar detalhes de uma prova sem visualizar o gabarito;
+- selecionar alternativas;
+- informar identificador e nome;
+- submeter respostas;
+- visualizar pontuação, percentual e acertos/erros após a correção automática.
+
+### Vite em desenvolvimento
+
+Durante o desenvolvimento, o Vite roda na porta `5173`.
+
+A aplicação deve ser acessada por:
+
+```text
+http://localhost:8000
