@@ -10,6 +10,7 @@ use App\Models\Exam;
 use App\Services\ExamService;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Http\JsonResponse;
 
 class ExamController extends Controller
 {
@@ -23,11 +24,13 @@ class ExamController extends Controller
     return ExamResource::collection($exams);
   }
 
-  public function store(StoreExamRequest $request, ExamService $service): ExamResource
+  public function store(StoreExamRequest $request, ExamService $service): JsonResponse
   {
     $exam = $service->create($request->validated());
 
-    return new ExamResource($exam);
+    return (new ExamResource($exam))
+        ->response()
+        ->setStatusCode(201);
   }
 
   public function show(Exam $exam): ExamResource
