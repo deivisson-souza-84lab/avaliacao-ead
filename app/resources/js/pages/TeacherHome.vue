@@ -26,15 +26,18 @@
       <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <p class="text-sm font-semibold uppercase tracking-wide text-indigo-600">
-            Nova prova
+            {{ editingExamId ? 'Editar prova' : 'Nova prova' }}
           </p>
 
           <h3 class="mt-2 text-2xl font-bold text-slate-900">
-            Cadastro de prova
+            {{ editingExamId ? 'Edição de prova' : 'Cadastro de prova' }}
           </h3>
 
           <p class="mt-2 text-sm text-slate-600">
-            Informe os dados da prova, suas questões e alternativas.
+            {{ editingExamId
+              ? 'Atualize os dados da prova, suas questões e alternativas.'
+              : 'Informe os dados da prova, suas questões e alternativas.'
+            }}
           </p>
         </div>
 
@@ -201,7 +204,7 @@
           <button type="submit"
             class="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-slate-300"
             :disabled="creatingExam">
-            {{ creatingExam ? 'Salvando...' : 'Salvar prova' }}
+            {{ creatingExam ? 'Salvando...' : (editingExamId ? 'Atualizar prova' : 'Salvar prova') }}
           </button>
         </div>
       </form>
@@ -302,6 +305,12 @@
                     class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                     @click="viewExam(exam)">
                     Ver
+                  </button>
+
+                  <button type="button"
+                    class="rounded-lg border border-indigo-200 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50"
+                    @click="openEditForm(exam)">
+                    Editar
                   </button>
 
                   <button type="button"
@@ -495,6 +504,7 @@ const showCreateForm = ref(false);
 const creatingExam = ref(false);
 const createErrorMessage = ref('');
 const createErrors = ref({});
+const editingExamId = ref(null);
 
 const examForm = ref(createEmptyExamForm());
 
@@ -575,6 +585,10 @@ async function deleteExam(exam) {
       clearSelectedExam();
     }
 
+    if (editingExamId.value === exam.id) {
+      closeCreateForm();
+    }
+
     await loadDashboard();
     await loadExams();
     await loadRanking();
@@ -590,8 +604,14 @@ async function submitCreateExam() {
   createErrorMessage.value = '';
   createErrors.value = {};
 
+  const isEditing = editingExamId.value !== null;
+
   try {
-    await api.post('/exams', examForm.value);
+    if (isEditing) {
+      await api.put(`/exams/${editingExamId.value}`, examForm.value);
+    } else {
+      await api.post('/exams', examForm.value);
+    }
 
     closeCreateForm();
 
@@ -599,8 +619,31 @@ async function submitCreateExam() {
     await loadExams();
     await loadRanking();
   } catch (error) {
-    createErrorMessage.value = error.message || 'Não foi possível cadastrar a prova.';
+    createErrorMessage.value = error.message || (
+      isEditing
+        ? 'Não foi possível atualizar a prova.'
+        : 'Não foi possível cadastrar a prova.'
+    );
     createErrors.value = error.errors || {};
+  } finally {
+    creatingExam.value = false;
+  }
+}
+
+async function openEditForm(exam) {
+  showCreateForm.value = true;
+  creatingExam.value = true;
+  createErrorMessage.value = '';
+  createErrors.value = {};
+  editingExamId.value = exam.id;
+
+  try {
+    const response = await api.get(`/exams/${exam.id}`);
+
+    examForm.value = fillExamForm(response.data);
+  } catch (error) {
+    createErrorMessage.value = error.message || 'Não foi possível carregar a prova para edição.';
+    examForm.value = createEmptyExamForm();
   } finally {
     creatingExam.value = false;
   }
@@ -664,6 +707,7 @@ function openCreateForm() {
   showCreateForm.value = true;
   createErrorMessage.value = '';
   createErrors.value = {};
+  editingExamId.value = null;
   examForm.value = createEmptyExamForm();
 }
 
@@ -671,6 +715,7 @@ function closeCreateForm() {
   showCreateForm.value = false;
   createErrorMessage.value = '';
   createErrors.value = {};
+  editingExamId.value = null;
   examForm.value = createEmptyExamForm();
 }
 
@@ -717,6 +762,21 @@ function markCorrectAlternative(questionIndex, alternativeIndex) {
 
 function firstCreateError(field) {
   return createErrors.value?.[field]?.[0] || '';
+}
+
+function fillExamForm(exam) {
+  return {
+    title: exam.title || '',
+    description: exam.description || '',
+    is_available: Boolean(exam.is_available),
+    questions: (exam.questions || []).map((question) => ({
+      statement: question.statement || '',
+      alternatives: (question.alternatives || []).map((alternative) => ({
+        text: alternative.text || '',
+        is_correct: Boolean(alternative.is_correct),
+      })),
+    })),
+  };
 }
 
 onMounted(() => {
