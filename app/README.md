@@ -354,6 +354,18 @@ Content-Type: application/json
 
 ---
 
+## Especificação OpenAPI
+
+Além dos exemplos documentados neste README, a API possui uma especificação formal em OpenAPI 3.0:
+
+[`docs/openapi.yaml`](docs/openapi.yaml)
+
+Esta especificação documenta endpoints, payloads, respostas, paginação e erros de validação.
+
+A documentação foi mantida como arquivo estático para evitar acoplar a entrega a um pacote Swagger no Laravel nesta etapa final. O arquivo pode ser visualizado em qualquer ferramenta compatível com OpenAPI/Swagger, como Swagger Editor, Swagger UI, Postman, Insomnia, Stoplight ou Redoc.
+
+---
+
 # Professor
 
 ## Listar provas
@@ -894,7 +906,6 @@ Ainda pendente:
 Possíveis melhorias futuras:
 
 - paginação visual avançada no frontend;
-- documentação OpenAPI/Swagger;
 - versionamento ou bloqueio de edição para provas que já possuem tentativas;
 - refinamento visual da interface;
 - filtros e busca na listagem de provas;

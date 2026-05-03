@@ -268,7 +268,9 @@ paths:
       tags:
         - Dashboard
       summary: Ranking paginado
-      description: Retorna o ranking paginado de tentativas.
+      description: |
+        Retorna o ranking paginado de tentativas.
+        O ranking é ordenado por maior percentual, maior pontuação e data de submissão.
       operationId: getDashboardRanking
       parameters:
         - $ref: "#/components/parameters/Page"
