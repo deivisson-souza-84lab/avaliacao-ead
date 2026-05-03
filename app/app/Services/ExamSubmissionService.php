@@ -7,6 +7,7 @@ use App\Models\Exam;
 use App\Models\ExamAttempt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Cache;
 
 class ExamSubmissionService
 {
@@ -113,6 +114,8 @@ class ExamSubmissionService
       foreach ($answerRows as $answerRow) {
         $attempt->answers()->create($answerRow);
       }
+
+      Cache::forget('dashboard:summary');
 
       return $attempt->load('exam', 'answers');
     });
