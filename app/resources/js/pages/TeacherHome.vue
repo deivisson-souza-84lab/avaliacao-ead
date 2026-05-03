@@ -111,6 +111,96 @@
         </table>
       </div>
     </div>
+
+    <section class="mt-8">
+      <div class="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h3 class="text-xl font-bold text-slate-900">
+            Ranking de tentativas
+          </h3>
+
+          <p class="mt-1 text-sm text-slate-600">
+            Melhores desempenhos registrados nas provas.
+          </p>
+        </div>
+      </div>
+
+      <div v-if="rankingLoading" class="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+        Carregando ranking...
+      </div>
+
+      <div v-else-if="rankingErrorMessage" class="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+        {{ rankingErrorMessage }}
+      </div>
+
+      <div v-else-if="ranking.length === 0"
+        class="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
+        Nenhuma tentativa registrada até o momento.
+      </div>
+
+      <div v-else class="overflow-hidden rounded-2xl border border-slate-200">
+        <table class="min-w-full divide-y divide-slate-200">
+          <thead class="bg-slate-50">
+            <tr>
+              <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Posição
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Aluno
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Prova
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Pontuação
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Percentual
+              </th>
+              <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Enviado em
+              </th>
+            </tr>
+          </thead>
+
+          <tbody class="divide-y divide-slate-200 bg-white">
+            <tr v-for="(attempt, index) in ranking" :key="attempt.id" class="transition hover:bg-slate-50">
+              <td class="px-5 py-4 text-sm font-semibold text-slate-900">
+                #{{ index + 1 }}
+              </td>
+
+              <td class="px-5 py-4">
+                <p class="font-semibold text-slate-900">
+                  {{ attempt.student_name || 'Aluno sem nome' }}
+                </p>
+
+                <p class="mt-1 text-sm text-slate-500">
+                  {{ attempt.student_identifier }}
+                </p>
+              </td>
+
+              <td class="px-5 py-4 text-sm text-slate-600">
+                {{ attempt.exam?.title || '-' }}
+              </td>
+
+              <td class="px-5 py-4 text-sm text-slate-600">
+                {{ attempt.score }} / {{ attempt.total_questions }}
+              </td>
+
+              <td class="px-5 py-4">
+                <span class="inline-flex rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+                  {{ attempt.percentage }}%
+                </span>
+              </td>
+
+              <td class="px-5 py-4 text-sm text-slate-600">
+                {{ formatDate(attempt.submitted_at) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
   </section>
 </template>
 
@@ -121,6 +211,10 @@ import { api } from '../services/api';
 const exams = ref([]);
 const loading = ref(false);
 const errorMessage = ref('');
+
+const ranking = ref([]);
+const rankingLoading = ref(false);
+const rankingErrorMessage = ref('');
 
 const dashboard = ref({
   average_score: 0,
@@ -157,6 +251,21 @@ async function loadExams() {
   }
 }
 
+async function loadRanking() {
+  rankingLoading.value = true;
+  rankingErrorMessage.value = '';
+
+  try {
+    const response = await api.get('/dashboard/ranking?per_page=10');
+
+    ranking.value = response.data || [];
+  } catch (error) {
+    rankingErrorMessage.value = error.message || 'Não foi possível carregar o ranking.';
+  } finally {
+    rankingLoading.value = false;
+  }
+}
+
 function formatDate(value) {
   if (!value) {
     return '-';
@@ -181,5 +290,6 @@ function formatDate(value) {
 onMounted(() => {
   loadDashboard();
   loadExams();
+  loadRanking();
 });
 </script>
