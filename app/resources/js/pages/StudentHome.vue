@@ -28,29 +28,71 @@
         Nenhuma prova disponível no momento.
       </div>
 
-      <div v-else class="grid gap-4 md:grid-cols-2">
-        <article v-for="exam in exams" :key="exam.id"
-          class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-          <div class="flex h-full flex-col">
-            <div>
-              <h3 class="text-lg font-bold text-slate-900">
-                {{ exam.title }}
-              </h3>
+      <div v-else>
+        <div class="grid gap-4 md:grid-cols-2">
+          <article v-for="exam in exams" :key="exam.id"
+            class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+            <div class="flex h-full flex-col">
+              <div>
+                <h3 class="text-lg font-bold text-slate-900">
+                  {{ exam.title }}
+                </h3>
 
-              <p class="mt-2 text-sm text-slate-600">
-                {{ exam.description || 'Sem descrição.' }}
-              </p>
-            </div>
+                <p class="mt-2 text-sm text-slate-600">
+                  {{ exam.description || 'Sem descrição.' }}
+                </p>
+              </div>
 
-            <div class="mt-5 flex flex-1 items-end">
-              <button type="button"
-                class="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
-                @click="selectExam(exam)">
-                Acessar prova
-              </button>
+              <div class="mt-5 flex flex-1 items-end">
+                <button type="button"
+                  class="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+                  @click="selectExam(exam)">
+                  Acessar prova
+                </button>
+              </div>
             </div>
+          </article>
+        </div>
+
+        <div v-if="examsMeta && examsMeta.total > 0" class="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <p class="text-sm text-slate-600">
+            Mostrando {{ examsMeta.from }}–{{ examsMeta.to }} de {{ examsMeta.total }} provas disponíveis.
+          </p>
+
+          <div v-if="examsMeta.last_page > 1" class="flex flex-wrap gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="loading || examsMeta.current_page === 1"
+              @click="goToExamsPage(examsMeta.current_page - 1)"
+            >
+              Anterior
+            </button>
+
+            <button
+              v-for="page in paginationPages(examsMeta)"
+              :key="`student-exam-page-${page}`"
+              type="button"
+              class="rounded-lg border px-3 py-2 text-xs font-semibold transition"
+              :class="page === examsMeta.current_page
+                ? 'border-emerald-600 bg-emerald-600 text-white'
+                : 'border-slate-300 text-slate-700 hover:bg-slate-50'"
+              :disabled="loading"
+              @click="goToExamsPage(page)"
+            >
+              {{ page }}
+            </button>
+
+            <button
+              type="button"
+              class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              :disabled="loading || examsMeta.current_page === examsMeta.last_page"
+              @click="goToExamsPage(examsMeta.current_page + 1)"
+            >
+              Próxima
+            </button>
           </div>
-        </article>
+        </div>
       </div>
     </div>
 
@@ -186,6 +228,9 @@ import { onMounted, ref } from 'vue';
 import { api } from '../services/api';
 
 const exams = ref([]);
+const examsMeta = ref(null);
+const examsPage = ref(1);
+const examsPerPage = 10;
 const loading = ref(false);
 const errorMessage = ref('');
 
@@ -202,14 +247,20 @@ const submitErrorMessage = ref('');
 const submitErrors = ref({});
 const result = ref(null);
 
-async function loadExams() {
+async function loadExams(page = examsPage.value) {
   loading.value = true;
   errorMessage.value = '';
 
   try {
-    const response = await api.get('/student/exams');
+    const response = await api.get(`/student/exams?page=${page}&per_page=${examsPerPage}`);
 
     exams.value = response.data || [];
+    examsMeta.value = response.meta || null;
+    examsPage.value = examsMeta.value?.current_page || page;
+
+    if (exams.value.length === 0 && examsPage.value > 1) {
+      await loadExams(examsPage.value - 1);
+    }
   } catch (error) {
     errorMessage.value = error.message || 'Não foi possível carregar as provas disponíveis.';
   } finally {
@@ -287,6 +338,21 @@ function firstError(field) {
   return submitErrors.value?.[field]?.[0] || '';
 }
 
+function paginationPages(meta) {
+  return (meta?.links || [])
+    .map((link) => link.page)
+    .filter((page, index, pages) => page !== null && pages.indexOf(page) === index);
+}
+
+function goToExamsPage(page) {
+  if (!examsMeta.value || page < 1 || page > examsMeta.value.last_page || page === examsMeta.value.current_page) {
+    return;
+  }
+
+  clearSelectedExam();
+  loadExams(page);
+}
+
 function allQuestionsAnswered() {
   if (!selectedExam.value?.questions?.length) {
     return false;
@@ -295,5 +361,5 @@ function allQuestionsAnswered() {
   return selectedExam.value.questions.every((question) => answers.value[question.id]);
 }
 
-onMounted(loadExams);
+onMounted(() => loadExams());
 </script>
