@@ -21,6 +21,38 @@
       </button>
     </div>
 
+    <div class="mt-8 grid gap-4 md:grid-cols-3">
+      <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p class="text-sm font-medium text-slate-500">
+          Média geral
+        </p>
+
+        <p class="mt-2 text-3xl font-bold text-slate-900">
+          {{ dashboard.average_score }}%
+        </p>
+      </article>
+
+      <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p class="text-sm font-medium text-slate-500">
+          Melhor pontuação
+        </p>
+
+        <p class="mt-2 text-3xl font-bold text-slate-900">
+          {{ dashboard.best_score }}%
+        </p>
+      </article>
+
+      <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <p class="text-sm font-medium text-slate-500">
+          Tentativas
+        </p>
+
+        <p class="mt-2 text-3xl font-bold text-slate-900">
+          {{ dashboard.total_attempts }}
+        </p>
+      </article>
+    </div>
+
     <div class="mt-8">
       <div v-if="loading" class="rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
         Carregando provas...
@@ -90,6 +122,26 @@ const exams = ref([]);
 const loading = ref(false);
 const errorMessage = ref('');
 
+const dashboard = ref({
+  average_score: 0,
+  best_score: 0,
+  total_attempts: 0,
+});
+
+async function loadDashboard() {
+  try {
+    const response = await api.get('/dashboard');
+
+    dashboard.value = response.data || {
+      average_score: 0,
+      best_score: 0,
+      total_attempts: 0,
+    };
+  } catch (error) {
+    console.error(error);
+  }
+}
+
 async function loadExams() {
   loading.value = true;
   errorMessage.value = '';
@@ -126,5 +178,8 @@ function formatDate(value) {
   return `${formattedDate} - ${formattedTime}`;
 }
 
-onMounted(loadExams);
+onMounted(() => {
+  loadDashboard();
+  loadExams();
+});
 </script>
