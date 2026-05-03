@@ -97,7 +97,8 @@
           <div class="mt-4 space-y-2">
             <label v-for="alternative in question.alternatives" :key="alternative.id"
               class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 text-sm transition hover:bg-slate-50">
-              <input type="radio" :name="`question-${question.id}`" class="mt-1" disabled>
+              <input v-model="answers[question.id]" type="radio" :name="`question-${question.id}`"
+                :value="alternative.id" class="mt-1" :disabled="submitting || result" />
 
               <span class="text-slate-700">
                 {{ alternative.text }}
@@ -107,9 +108,75 @@
         </article>
       </div>
 
-      <p class="mt-5 text-sm text-slate-500">
-        A seleção e submissão das respostas será implementada na próxima etapa.
-      </p>
+      <div class="mt-6 rounded-xl border border-slate-200 bg-white p-5">
+        <h4 class="font-semibold text-slate-900">
+          Identificação do aluno
+        </h4>
+
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="student_identifier">
+              Identificador
+            </label>
+
+            <input id="student_identifier" v-model="studentIdentifier" type="text"
+              class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              placeholder="Ex.: aluno@email.com" :disabled="submitting || result">
+
+            <p v-if="firstError('student_identifier')" class="mt-1 text-sm text-red-600">
+              {{ firstError('student_identifier') }}
+            </p>
+          </div>
+
+          <div>
+            <label class="text-sm font-medium text-slate-700" for="student_name">
+              Nome
+            </label>
+
+            <input id="student_name" v-model="studentName" type="text"
+              class="mt-1 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              placeholder="Ex.: Aluno 1" :disabled="submitting || result">
+
+            <p v-if="firstError('student_name')" class="mt-1 text-sm text-red-600">
+              {{ firstError('student_name') }}
+            </p>
+          </div>
+        </div>
+
+        <div v-if="submitErrorMessage" class="mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {{ submitErrorMessage }}
+        </div>
+
+        <button type="button"
+          class="mt-5 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          :disabled="submitting || result || !studentIdentifier || !allQuestionsAnswered()" @click="submitExam">
+          {{ submitting ? 'Enviando...' : 'Enviar respostas' }}
+        </button>
+      </div>
+
+      <div v-if="result" class="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+        <p class="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+          Resultado
+        </p>
+
+        <h4 class="mt-2 text-2xl font-bold text-emerald-950">
+          {{ result.score }} de {{ result.total_questions }} acertos
+        </h4>
+
+        <p class="mt-2 text-emerald-800">
+          Percentual final: <strong>{{ result.percentage }}%</strong>
+        </p>
+
+        <div class="mt-4 space-y-2">
+          <div v-for="answer in result.answers" :key="`${answer.question_id}-${answer.alternative_id}`"
+            class="rounded-xl bg-white p-3 text-sm">
+            Questão {{ answer.question_id }}:
+            <strong :class="answer.is_correct ? 'text-emerald-700' : 'text-red-700'">
+              {{ answer.is_correct ? 'correta' : 'incorreta' }}
+            </strong>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 </template>
@@ -125,6 +192,15 @@ const errorMessage = ref('');
 const selectedExam = ref(null);
 const selectedExamLoading = ref(false);
 const selectedExamErrorMessage = ref('');
+
+const answers = ref({});
+const studentIdentifier = ref('');
+const studentName = ref('');
+
+const submitting = ref(false);
+const submitErrorMessage = ref('');
+const submitErrors = ref({});
+const result = ref(null);
 
 async function loadExams() {
   loading.value = true;
@@ -146,6 +222,13 @@ async function selectExam(exam) {
   selectedExamLoading.value = true;
   selectedExamErrorMessage.value = '';
 
+  answers.value = {};
+  studentIdentifier.value = '';
+  studentName.value = '';
+  submitErrorMessage.value = '';
+  submitErrors.value = {};
+  result.value = null;
+
   try {
     const response = await api.get(`/student/exams/${exam.id}`);
 
@@ -160,6 +243,56 @@ async function selectExam(exam) {
 function clearSelectedExam() {
   selectedExam.value = null;
   selectedExamErrorMessage.value = '';
+
+  answers.value = {};
+  studentIdentifier.value = '';
+  studentName.value = '';
+  submitErrorMessage.value = '';
+  submitErrors.value = {};
+  result.value = null;
+}
+
+async function submitExam() {
+  if (!selectedExam.value) {
+    return;
+  }
+
+  submitting.value = true;
+  submitErrorMessage.value = '';
+  submitErrors.value = {};
+  result.value = null;
+
+  const payload = {
+    student_identifier: studentIdentifier.value,
+    student_name: studentName.value || null,
+    answers: selectedExam.value.questions.map((question) => ({
+      question_id: question.id,
+      alternative_id: answers.value[question.id],
+    })),
+  };
+
+  try {
+    const response = await api.post(`/student/exams/${selectedExam.value.id}/submit`, payload);
+
+    result.value = response.data;
+  } catch (error) {
+    submitErrorMessage.value = error.message || 'Não foi possível submeter a prova.';
+    submitErrors.value = error.errors || {};
+  } finally {
+    submitting.value = false;
+  }
+}
+
+function firstError(field) {
+  return submitErrors.value?.[field]?.[0] || '';
+}
+
+function allQuestionsAnswered() {
+  if (!selectedExam.value?.questions?.length) {
+    return false;
+  }
+
+  return selectedExam.value.questions.every((question) => answers.value[question.id]);
 }
 
 onMounted(loadExams);
