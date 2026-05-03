@@ -75,3 +75,11 @@ RUN addgroup -g ${GID} appgroup \
 
 RUN mkdir -p /var/www/html \
   && chown -R appuser:appgroup /var/www/html
+
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+ENTRYPOINT ["entrypoint.sh"]
+
+CMD ["php-fpm"]
