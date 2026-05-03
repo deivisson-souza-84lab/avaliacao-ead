@@ -9,6 +9,7 @@ use App\Http\Resources\StudentExamResource;
 use App\Models\Exam;
 use App\Services\ExamSubmissionService;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\JsonResponse;
 
 class StudentExamController extends Controller
 {
@@ -35,9 +36,11 @@ class StudentExamController extends Controller
     SubmitExamRequest $request,
     Exam $exam,
     ExamSubmissionService $service
-  ): ExamAttemptResource {
+  ): JsonResponse {
     $attempt = $service->submit($exam, $request->validated());
 
-    return new ExamAttemptResource($attempt);
+    return (new ExamAttemptResource($attempt))
+      ->response()
+      ->setStatusCode(201);
   }
 }
