@@ -71,11 +71,37 @@ A área do professor permite:
 A área do aluno permite:
 
 - listar provas disponíveis;
+- navegar visualmente pela paginação de provas disponíveis;
 - acessar detalhes de uma prova sem visualizar o gabarito;
 - selecionar alternativas;
 - informar identificador e nome;
 - submeter respostas;
 - visualizar pontuação, percentual e acertos/erros após a correção automática.
+
+### Decisão sobre a Área do Aluno
+
+A Área do Aluno não representa um painel individual de um aluno autenticado.
+
+Ela representa uma **vitrine pública de provas disponíveis para realização**. Qualquer aluno pode acessar a tela, escolher uma prova, informar sua identificação no momento da submissão e enviar suas respostas.
+
+Essa decisão foi tomada porque o escopo da entrega não inclui autenticação, sessão de usuário, cadastro de aluno ou histórico individual. O identificador do aluno é informado apenas no envio da prova e usado pela API para impedir que o mesmo aluno realize a mesma prova mais de uma vez.
+
+Portanto, a listagem de provas na Área do Aluno é global e mostra provas disponíveis, não uma lista personalizada por aluno.
+
+Fluxo esperado:
+
+```text
+1. O aluno acessa a Área do Aluno.
+2. A interface lista as provas disponíveis.
+3. O aluno escolhe uma prova.
+4. A API retorna a prova sem expor o gabarito.
+5. O aluno informa identificador e nome.
+6. O aluno submete as respostas.
+7. A API corrige automaticamente e registra a tentativa.
+8. O aluno recebe pontuação, percentual e indicação de acertos/erros.
+```
+
+Funcionalidades como “minhas provas”, “meu histórico”, “continuar prova” ou “resultados por aluno logado” dependeriam de autenticação e estão fora do escopo desta versão.
 
 ### Vite em desenvolvimento
 
